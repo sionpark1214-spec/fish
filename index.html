@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fish 🐟</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #4fc3f7 0%, #0277bd 60%, #01579b 100%);
+      overflow: hidden;
+    }
+    .center {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      text-align: center;
+      user-select: none;
+    }
+    .fish {
+      font-size: 80px;
+      animation: swim 3s ease-in-out infinite;
+    }
+    @keyframes swim {
+      0%, 100% { transform: translateX(-20px) scaleX(1); }
+      49% { transform: translateX(20px) scaleX(1); }
+      50% { transform: translateX(20px) scaleX(-1); }
+      99% { transform: translateX(-20px) scaleX(-1); }
+    }
+    h1 { font-size: 2.5rem; margin-top: 20px; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    p { margin-top: 12px; opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="center">
+    <div class="fish">🐟</div>
+    <h1>Fish</h1>
+    <p>프로젝트 시작!</p>
+  </div>
+</body>
+</html>
