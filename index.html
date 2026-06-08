@@ -110,13 +110,37 @@
   </div>
 </div>
 
+<!-- 구형/인앱 브라우저에서도 importmap 작동하게 폴리필 -->
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
 <script type="importmap">
 {
   "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
   }
 }
+</script>
+
+<div id="loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;background:linear-gradient(180deg,#4ea7e0,#9fd6f5);color:#fff;z-index:50;font-size:20px;font-weight:700;">
+  <div style="font-size:60px;animation:spin 1.5s linear infinite;">🐟</div>
+  <div style="margin-top:16px;">바다 불러오는 중...</div>
+  <div id="loadErr" style="margin-top:14px;font-size:14px;font-weight:400;opacity:.9;max-width:80vw;text-align:center;"></div>
+  <style>@keyframes spin{to{transform:rotate(360deg);}}</style>
+</div>
+
+<script>
+  // 로딩 실패 감지 (15초 안에 게임 시작 못하면 안내)
+  window.__gameReady=false;
+  setTimeout(function(){
+    if(!window.__gameReady){
+      var e=document.getElementById('loadErr');
+      if(e) e.innerHTML='인터넷 연결을 확인해줘!<br>또는 사파리/크롬으로 열어줘 🙏';
+    }
+  },15000);
+  window.addEventListener('error',function(ev){
+    var e=document.getElementById('loadErr');
+    if(e && !window.__gameReady) e.textContent='문제 발생: '+(ev.message||'로드 실패');
+  });
 </script>
 
 <script type="module">
@@ -416,6 +440,10 @@ let hintHidden=false;
 controls.addEventListener('start',()=>{
   if(!hintHidden){ hintHidden=true; const h=document.getElementById('rotateHint'); h.style.opacity='0'; setTimeout(()=>h.remove(),700); }
 });
+
+// 게임 준비 완료 → 로딩 화면 제거
+window.__gameReady=true;
+{ const l=document.getElementById('loading'); if(l){ l.style.transition='opacity .5s'; l.style.opacity='0'; setTimeout(()=>l.remove(),550); } }
 
 function animate(){
   requestAnimationFrame(animate);
