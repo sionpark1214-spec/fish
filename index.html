@@ -149,11 +149,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 /* ============ 물고기 데이터 ============ */
 const TIERS = {
-  common:   { name:'흔함',   color:'#b8c4cc', speed:1.0, zone:90 },
-  uncommon: { name:'언커먼', color:'#5fd36a', speed:1.5, zone:80 },
-  rare:     { name:'레어',   color:'#4ea3ff', speed:2.2, zone:70 },
-  epic:     { name:'에픽',   color:'#c06bff', speed:3.0, zone:58 },
-  legend:   { name:'전설',   color:'#ffb43d', speed:4.0, zone:48 },
+  common:   { name:'흔함',   color:'#b8c4cc', speed:0.7, zone:115 },
+  uncommon: { name:'언커먼', color:'#5fd36a', speed:1.0, zone:100 },
+  rare:     { name:'레어',   color:'#4ea3ff', speed:1.35, zone:88 },
+  epic:     { name:'에픽',   color:'#c06bff', speed:1.7, zone:74 },
+  legend:   { name:'전설',   color:'#ffb43d', speed:2.1, zone:62 },
 };
 const FISH = [
   { id:'anchovy',  emoji:'🐟', name:'멸치',     tier:'common' },
@@ -345,7 +345,7 @@ function startMinigame(){
   mg={
     trackW, zoneW:t.zone, speed:t.speed,
     playerX:trackW/2, vx:0,
-    progress:30, t:0,
+    progress:45, t:0,
   };
   statusEl.textContent='';
   setState(ST.MINI);
@@ -354,13 +354,13 @@ function startMinigame(){
 function updateMinigame(dt){
   mg.t+=dt;
   const W=mg.trackW;
-  // 타겟 좌우 이동 (등급=속도)
-  const amp=(W-mg.zoneW)/2 - 6;
-  const targetX = W/2 + Math.sin(mg.t*mg.speed*1.4 + Math.sin(mg.t*0.7)) * amp;
-  // 플레이어 물리: 누르면 오른쪽, 떼면 왼쪽
-  const acc = pressing ? 900 : -700;
+  // 타겟 좌우 이동 (등급=속도). 진폭을 약간 줄여 가장자리까진 안 감
+  const amp=((W-mg.zoneW)/2 - 6) * 0.85;
+  const targetX = W/2 + Math.sin(mg.t*mg.speed) * amp;
+  // 플레이어 물리: 누르면 오른쪽, 떼면 왼쪽 — 반응 빠르게(타겟보다 빠르게 움직일 수 있음)
+  const acc = pressing ? 2600 : -2100;
   mg.vx += acc*dt;
-  mg.vx *= 0.90;
+  mg.vx *= 0.82;
   mg.playerX += mg.vx*dt;
   const half=mg.zoneW/2;
   if(mg.playerX<half){ mg.playerX=half; mg.vx=0; }
@@ -368,15 +368,15 @@ function updateMinigame(dt){
   // 렌더
   zoneEl.style.left=(mg.playerX-half)+'px';
   targetEl.style.left=targetX+'px';
-  // 판정
+  // 판정 (관대하게)
   const inside = Math.abs(targetX-mg.playerX) < half;
-  if(inside) mg.progress += 32*dt;
-  else mg.progress -= 22*dt;
+  if(inside) mg.progress += 42*dt;
+  else mg.progress -= 15*dt;
   mg.progress=Math.max(0,Math.min(100,mg.progress));
   progfill.style.width=mg.progress+'%';
   progfill.style.background = inside ? 'linear-gradient(90deg,#8bff7a,#33cc44)' : 'linear-gradient(90deg,#ffe14d,#ff9f1a)';
   if(mg.progress>=100){ endMinigame(true); }
-  else if(mg.progress<=0 && mg.t>1.2){ endMinigame(false); }
+  else if(mg.progress<=0 && mg.t>2.0){ endMinigame(false); }
 }
 
 function endMinigame(success){
