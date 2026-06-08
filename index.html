@@ -40,8 +40,12 @@
   .track { position:relative; width:100%; height:100%; border-radius:24px; overflow:hidden; background:linear-gradient(90deg,#14384f,#0a1f2e); }
   #zone { position:absolute; top:4px; bottom:4px; width:78px; background:linear-gradient(90deg,#8bff7a,#33cc44); border-radius:20px; box-shadow:0 0 14px rgba(120,255,120,.9); }
   #target { position:absolute; top:50%; transform:translate(-50%,-50%); font-size:30px; will-change:left; }
-  #progwrap { width:100%; height:14px; background:rgba(0,0,0,.45); border-radius:10px; margin-top:12px; overflow:hidden; }
+  #timewrap { position:relative; width:100%; height:20px; background:rgba(0,0,0,.45); border-radius:11px; margin-bottom:10px; overflow:hidden; }
+  #timefill { height:100%; width:100%; background:linear-gradient(90deg,#ff6b6b,#ff3b3b); border-radius:11px; transition:width .08s linear; }
+  #timetext { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800; text-shadow:0 1px 3px rgba(0,0,0,.6); }
+  #progwrap { position:relative; width:100%; height:16px; background:rgba(0,0,0,.45); border-radius:10px; margin-top:12px; overflow:hidden; }
   #progfill { height:100%; width:0%; background:linear-gradient(90deg,#ffe14d,#ff9f1a); border-radius:10px; transition:width .05s linear; }
+  #proglabel { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:800; text-shadow:0 1px 3px rgba(0,0,0,.6); }
   #mini .hint { color:#cfefff; text-align:center; font-size:12px; margin-top:8px; }
 
   /* 결과 모달 */
@@ -88,14 +92,15 @@
 
 <div id="mini">
   <div class="title" id="miniTitle">막대를 물고기에 맞춰!</div>
+  <div id="timewrap"><div id="timefill"></div><span id="timetext">⏱ 8.0</span></div>
   <div class="barwrap">
     <div class="track">
       <div id="zone"></div>
       <div id="target">🐟</div>
     </div>
   </div>
-  <div id="progwrap"><div id="progfill"></div></div>
-  <div class="hint">꾹 누르면 → 오른쪽, 떼면 ← 왼쪽</div>
+  <div id="progwrap"><div id="progfill"></div><span id="proglabel">게이지 0%</span></div>
+  <div class="hint">⏱ 시간 안에 게이지를 다 채워!</div>
 </div>
 
 <div id="result">
@@ -342,11 +347,15 @@ function startMinigame(){
   miniEl.style.display='block';            // 먼저 보이게 한 뒤 너비 측정!
   controls.enabled=false;                  // 미니게임 중엔 화면 회전 끔
   const trackW=document.querySelector('.barwrap .track').clientWidth;
+  const timeMax = 9.0; // 제한 시간(초)
   mg={
     trackW, zoneW:t.zone, speed:t.speed,
     playerX:trackW/2, vx:0,
-    progress:45, t:0,
+    progress:10, t:0,
+    timeLeft:timeMax, timeMax,
   };
+  document.getElementById('timefill').style.width='100%';
+  document.getElementById('timetext').textContent='⏱ '+timeMax.toFixed(1);
   statusEl.textContent='';
   setState(ST.MINI);
 }
@@ -368,15 +377,24 @@ function updateMinigame(dt){
   // 렌더
   zoneEl.style.left=(mg.playerX-half)+'px';
   targetEl.style.left=targetX+'px';
-  // 판정 (관대하게)
+  // 판정: 따라가면 게이지 채우기 (관대하게)
   const inside = Math.abs(targetX-mg.playerX) < half;
-  if(inside) mg.progress += 42*dt;
-  else mg.progress -= 15*dt;
+  if(inside) mg.progress += 30*dt;
+  else mg.progress -= 9*dt;       // 벗어나면 살짝 줄지만 0 밑으로 안 죽음
   mg.progress=Math.max(0,Math.min(100,mg.progress));
   progfill.style.width=mg.progress+'%';
   progfill.style.background = inside ? 'linear-gradient(90deg,#8bff7a,#33cc44)' : 'linear-gradient(90deg,#ffe14d,#ff9f1a)';
-  if(mg.progress>=100){ endMinigame(true); }
-  else if(mg.progress<=0 && mg.t>2.0){ endMinigame(false); }
+  document.getElementById('proglabel').textContent='게이지 '+Math.floor(mg.progress)+'%';
+
+  // 시간 제한
+  mg.timeLeft -= dt;
+  const tf=document.getElementById('timefill');
+  tf.style.width=Math.max(0,mg.timeLeft/mg.timeMax*100)+'%';
+  document.getElementById('timetext').textContent='⏱ '+Math.max(0,mg.timeLeft).toFixed(1);
+  if(mg.timeLeft < mg.timeMax*0.25) tf.style.background='linear-gradient(90deg,#ffb13b,#ff3b3b)';
+
+  if(mg.progress>=100){ endMinigame(true); }       // 게이지 다 채움 → 성공!
+  else if(mg.timeLeft<=0){ endMinigame(false); }    // 시간 초과 → 놓침
 }
 
 function endMinigame(success){
