@@ -1,46 +1,506 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Fish 🐟</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #4fc3f7 0%, #0277bd 60%, #01579b 100%);
-      overflow: hidden;
-    }
-    .center {
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      text-align: center;
-      user-select: none;
-    }
-    .fish {
-      font-size: 80px;
-      animation: swim 3s ease-in-out infinite;
-    }
-    @keyframes swim {
-      0%, 100% { transform: translateX(-20px) scaleX(1); }
-      49% { transform: translateX(20px) scaleX(1); }
-      50% { transform: translateX(20px) scaleX(-1); }
-      99% { transform: translateX(-20px) scaleX(-1); }
-    }
-    h1 { font-size: 2.5rem; margin-top: 20px; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-    p { margin-top: 12px; opacity: 0.9; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Fish 🐟 3D 낚시</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#012; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; user-select:none; -webkit-user-select:none; touch-action:none; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+
+  /* HUD */
+  .hud { position:fixed; top:0; left:0; right:0; padding:14px 16px; display:flex; justify-content:space-between; align-items:flex-start; z-index:10; pointer-events:none; }
+  .pill { background:rgba(0,0,0,.4); color:#fff; padding:8px 14px; border-radius:22px; font-size:15px; font-weight:700; backdrop-filter:blur(4px); }
+  .pill small { font-weight:400; opacity:.8; }
+
+  /* 안내 */
+  #rotateHint { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:#fff; background:rgba(0,0,0,.4); padding:10px 18px; border-radius:20px; font-size:14px; z-index:8; opacity:.9; transition:opacity .6s; pointer-events:none; }
+
+  /* 낚시 버튼 */
+  #castBtn { position:fixed; bottom:34px; left:50%; transform:translateX(-50%); background:linear-gradient(180deg,#ffcb3d,#ffa600); color:#3a2600; font-weight:800; font-size:20px; padding:16px 48px; border:none; border-radius:34px; box-shadow:0 5px 0 #c97f00,0 8px 18px rgba(0,0,0,.35); z-index:10; }
+  #castBtn:active { transform:translateX(-50%) translateY(3px); box-shadow:0 2px 0 #c97f00,0 4px 10px rgba(0,0,0,.35); }
+  #castBtn.hidden { display:none; }
+
+  /* 상태 메시지 */
+  #status { position:fixed; bottom:110px; left:50%; transform:translateX(-50%); color:#fff; font-size:17px; font-weight:600; text-shadow:0 2px 6px rgba(0,0,0,.6); z-index:10; text-align:center; white-space:nowrap; }
+
+  /* 느낌표 + 잡기 */
+  #bite { position:fixed; inset:0; z-index:11; display:none; align-items:center; justify-content:center; flex-direction:column; }
+  #bite .mark { font-size:90px; animation:shake .25s infinite; filter:drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
+  @keyframes shake { 0%,100%{transform:rotate(-12deg) scale(1);} 50%{transform:rotate(12deg) scale(1.15);} }
+  #bite .tap { margin-top:6px; color:#fff; font-size:22px; font-weight:800; text-shadow:0 2px 8px #000; animation:pulse .5s infinite alternate; }
+  @keyframes pulse { from{opacity:.6;} to{opacity:1; transform:scale(1.08);} }
+
+  /* 미니게임 */
+  #mini { position:fixed; bottom:70px; left:50%; transform:translateX(-50%); width:min(92vw,420px); z-index:12; display:none; }
+  #mini .title { color:#fff; text-align:center; font-size:15px; margin-bottom:10px; text-shadow:0 2px 6px #000; }
+  .barwrap { position:relative; width:100%; height:48px; background:rgba(0,0,0,.5); border:3px solid #fff; border-radius:30px; padding:5px; box-shadow:0 6px 18px rgba(0,0,0,.4); }
+  .track { position:relative; width:100%; height:100%; border-radius:24px; overflow:hidden; background:linear-gradient(90deg,#14384f,#0a1f2e); }
+  #zone { position:absolute; top:4px; bottom:4px; width:78px; background:linear-gradient(90deg,#8bff7a,#33cc44); border-radius:20px; box-shadow:0 0 14px rgba(120,255,120,.9); }
+  #target { position:absolute; top:50%; transform:translate(-50%,-50%); font-size:30px; will-change:left; }
+  #progwrap { width:100%; height:14px; background:rgba(0,0,0,.45); border-radius:10px; margin-top:12px; overflow:hidden; }
+  #progfill { height:100%; width:0%; background:linear-gradient(90deg,#ffe14d,#ff9f1a); border-radius:10px; transition:width .05s linear; }
+  #mini .hint { color:#cfefff; text-align:center; font-size:12px; margin-top:8px; }
+
+  /* 결과 모달 */
+  #result { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; background:rgba(0,10,20,.55); backdrop-filter:blur(3px); }
+  .card { background:linear-gradient(180deg,#1b6fb0,#0c4a7a); border:3px solid rgba(255,255,255,.5); border-radius:26px; padding:28px 30px; text-align:center; color:#fff; width:min(82vw,330px); box-shadow:0 16px 50px rgba(0,0,0,.5); animation:popin .35s cubic-bezier(.2,1.4,.5,1); }
+  @keyframes popin { from{transform:scale(.6); opacity:0;} to{transform:scale(1); opacity:1;} }
+  .card .fishbig { font-size:84px; line-height:1; filter:drop-shadow(0 6px 14px rgba(0,0,0,.5)); }
+  .card h2 { font-size:24px; margin-top:10px; }
+  .card .tier { display:inline-block; margin-top:10px; padding:5px 16px; border-radius:18px; font-weight:800; font-size:14px; }
+  .card .size { margin-top:12px; font-size:15px; opacity:.95; }
+  .card .miss { font-size:20px; }
+  .card button { margin-top:20px; background:#ffcb3d; color:#3a2600; font-weight:800; font-size:18px; border:none; padding:13px 36px; border-radius:26px; box-shadow:0 4px 0 #c97f00; }
+  .card button:active { transform:translateY(2px); box-shadow:0 2px 0 #c97f00; }
+
+  /* 도감 */
+  #dexBtn { pointer-events:auto; cursor:pointer; }
+  #dex { position:fixed; inset:0; z-index:25; display:none; align-items:center; justify-content:center; background:rgba(0,10,20,.7); backdrop-filter:blur(4px); }
+  .dexcard { background:linear-gradient(180deg,#0e3a5c,#082a44); border:3px solid rgba(255,255,255,.4); border-radius:24px; padding:22px; width:min(90vw,400px); max-height:80vh; overflow:auto; color:#fff; }
+  .dexcard h2 { text-align:center; margin-bottom:14px; }
+  .dexgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .dexitem { background:rgba(255,255,255,.08); border-radius:14px; padding:10px 6px; text-align:center; font-size:12px; }
+  .dexitem .e { font-size:32px; }
+  .dexitem.locked { opacity:.35; }
+  .dexitem .cnt { opacity:.8; margin-top:2px; }
+  .dexclose { display:block; margin:16px auto 0; background:#ffcb3d; color:#3a2600; font-weight:800; border:none; padding:11px 30px; border-radius:22px; }
+</style>
 </head>
 <body>
-  <div class="center">
-    <div class="fish">🐟</div>
-    <h1>Fish</h1>
-    <p>게임 시작!</p>
+<div id="app"></div>
+
+<div class="hud">
+  <div class="pill">🐟 <span id="caughtCount">0</span> <small>마리</small></div>
+  <div class="pill" id="dexBtn">📖 도감</div>
+</div>
+
+<div id="rotateHint">손가락으로 화면을 돌려봐 🌊</div>
+<div id="status"></div>
+<button id="castBtn">🎣 낚시하기</button>
+
+<div id="bite">
+  <div class="mark">❗</div>
+  <div class="tap">탭! 탭!</div>
+</div>
+
+<div id="mini">
+  <div class="title" id="miniTitle">막대를 물고기에 맞춰!</div>
+  <div class="barwrap">
+    <div class="track">
+      <div id="zone"></div>
+      <div id="target">🐟</div>
+    </div>
   </div>
+  <div id="progwrap"><div id="progfill"></div></div>
+  <div class="hint">꾹 누르면 → 오른쪽, 떼면 ← 왼쪽</div>
+</div>
+
+<div id="result">
+  <div class="card" id="resultCard"></div>
+</div>
+
+<div id="dex">
+  <div class="dexcard">
+    <h2>📖 물고기 도감</h2>
+    <div class="dexgrid" id="dexGrid"></div>
+    <button class="dexclose" id="dexClose">닫기</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============ 물고기 데이터 ============ */
+const TIERS = {
+  common:   { name:'흔함',   color:'#b8c4cc', speed:1.0, zone:90 },
+  uncommon: { name:'언커먼', color:'#5fd36a', speed:1.5, zone:80 },
+  rare:     { name:'레어',   color:'#4ea3ff', speed:2.2, zone:70 },
+  epic:     { name:'에픽',   color:'#c06bff', speed:3.0, zone:58 },
+  legend:   { name:'전설',   color:'#ffb43d', speed:4.0, zone:48 },
+};
+const FISH = [
+  { id:'anchovy',  emoji:'🐟', name:'멸치',     tier:'common' },
+  { id:'sardine',  emoji:'🐠', name:'정어리',   tier:'common' },
+  { id:'mackerel', emoji:'🐟', name:'고등어',   tier:'common' },
+  { id:'squid',    emoji:'🦑', name:'오징어',   tier:'uncommon' },
+  { id:'octopus',  emoji:'🐙', name:'문어',     tier:'uncommon' },
+  { id:'crab',     emoji:'🦀', name:'꽃게',     tier:'uncommon' },
+  { id:'puffer',   emoji:'🐡', name:'복어',     tier:'rare' },
+  { id:'tropical', emoji:'🐠', name:'열대어',   tier:'rare' },
+  { id:'lobster',  emoji:'🦞', name:'바닷가재', tier:'rare' },
+  { id:'shark',    emoji:'🦈', name:'상어',     tier:'epic' },
+  { id:'dolphin',  emoji:'🐬', name:'돌고래',   tier:'epic' },
+  { id:'whale',    emoji:'🐳', name:'고래',     tier:'legend' },
+  { id:'dragon',   emoji:'🐉', name:'바다용',   tier:'legend' },
+];
+const TIER_WEIGHT = { common:50, uncommon:28, rare:14, epic:6, legend:2 };
+
+function pickFish(){
+  // 등급 먼저 가중치로 뽑고, 그 등급 물고기 중 랜덤
+  let total=0; for(const t in TIER_WEIGHT) total+=TIER_WEIGHT[t];
+  let r=Math.random()*total, tier='common';
+  for(const t in TIER_WEIGHT){ r-=TIER_WEIGHT[t]; if(r<=0){ tier=t; break; } }
+  const pool=FISH.filter(f=>f.tier===tier);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+/* ============ 저장된 도감 ============ */
+const dex = JSON.parse(localStorage.getItem('fish_dex')||'{}');
+let caughtTotal = parseInt(localStorage.getItem('fish_total')||'0',10);
+function saveDex(){ localStorage.setItem('fish_dex',JSON.stringify(dex)); localStorage.setItem('fish_total',caughtTotal); }
+document.getElementById('caughtCount').textContent = caughtTotal;
+
+/* ============ Three.js 씬 ============ */
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x9fd6f5, 30, 120);
+
+// 하늘 그라데이션 배경
+{
+  const c=document.createElement('canvas'); c.width=2; c.height=256;
+  const g=c.getContext('2d'); const grd=g.createLinearGradient(0,0,0,256);
+  grd.addColorStop(0,'#4ea7e0'); grd.addColorStop(0.5,'#9fd6f5'); grd.addColorStop(1,'#dff3ff');
+  g.fillStyle=grd; g.fillRect(0,0,2,256);
+  const tex=new THREE.CanvasTexture(c); scene.background=tex;
+}
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 500);
+camera.position.set(0, 7, 12);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, 1.5, 0);
+controls.minDistance = 7;
+controls.maxDistance = 22;
+controls.maxPolarAngle = Math.PI*0.49; // 수면 아래로 못 내려가게
+controls.minPolarAngle = Math.PI*0.12;
+controls.enablePan = false;
+
+// 조명
+scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+const sun = new THREE.DirectionalLight(0xfff2cc, 1.1);
+sun.position.set(10, 20, 8);
+scene.add(sun);
+
+/* ===== 바다 ===== */
+const SEA_SIZE = 200, SEG = 80;
+const seaGeo = new THREE.PlaneGeometry(SEA_SIZE, SEA_SIZE, SEG, SEG);
+seaGeo.rotateX(-Math.PI/2);
+const seaMat = new THREE.MeshStandardMaterial({ color:0x1f8fd6, transparent:true, opacity:0.92, roughness:0.35, metalness:0.1, flatShading:true });
+const sea = new THREE.Mesh(seaGeo, seaMat);
+scene.add(sea);
+const seaBase = seaGeo.attributes.position.array.slice();
+
+/* ===== 배 + 캐릭터 그룹 ===== */
+const boat = new THREE.Group();
+scene.add(boat);
+
+// 선체 (사다리꼴 느낌)
+const hullMat = new THREE.MeshStandardMaterial({ color:0xb5651d, roughness:0.6 });
+const hull = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.1, 3.4, 6), hullMat);
+hull.rotation.z = Math.PI/2; hull.rotation.x = Math.PI/2; hull.scale.set(1,1,0.55);
+hull.position.y = 0.4;
+boat.add(hull);
+// 갑판
+const deck = new THREE.Mesh(new THREE.CylinderGeometry(1.25,1.25,0.3,16), new THREE.MeshStandardMaterial({color:0xd9a066}));
+deck.position.y=0.95; deck.scale.set(1.3,1,0.85); boat.add(deck);
+
+// 캐릭터
+const guy = new THREE.Group();
+guy.position.set(0,1.1,0);
+boat.add(guy);
+const skin=new THREE.MeshStandardMaterial({color:0xffd9b3});
+const shirt=new THREE.MeshStandardMaterial({color:0x2f7de0});
+const body=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.5,0.95,12),shirt); body.position.y=0.5; guy.add(body);
+const head=new THREE.Mesh(new THREE.SphereGeometry(0.42,20,20),skin); head.position.y=1.28; guy.add(head);
+const hat=new THREE.Mesh(new THREE.ConeGeometry(0.5,0.5,16),new THREE.MeshStandardMaterial({color:0xe14b3b})); hat.position.y=1.62; guy.add(hat);
+const brim=new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.62,0.06,16),new THREE.MeshStandardMaterial({color:0xe14b3b})); brim.position.y=1.42; guy.add(brim);
+
+// 낚싯대
+const rod=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.06,3.2,8),new THREE.MeshStandardMaterial({color:0x7a4a1d}));
+rod.position.set(0.55,1.2,0.4); rod.rotation.z=-0.7; rod.rotation.x=-0.3; guy.add(rod);
+// 낚싯대 끝 위치 계산용 빈 오브젝트
+const rodTip=new THREE.Object3D(); rodTip.position.set(0,1.7,0); rod.add(rodTip);
+
+// 찌 + 줄
+const bobber=new THREE.Mesh(new THREE.SphereGeometry(0.16,12,12),new THREE.MeshStandardMaterial({color:0xff3b3b}));
+bobber.visible=false; scene.add(bobber);
+const lineMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.7});
+const lineGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
+const fishingLine=new THREE.Line(lineGeo,lineMat); fishingLine.visible=false; scene.add(fishingLine);
+
+// 물고기 그림자들 (장식)
+const shadows=[];
+for(let i=0;i<14;i++){
+  const s=new THREE.Mesh(new THREE.SphereGeometry(0.5,8,8),new THREE.MeshBasicMaterial({color:0x0a3a5c,transparent:true,opacity:0.3}));
+  s.scale.set(1.6,0.25,0.7);
+  const ang=Math.random()*Math.PI*2, rad=8+Math.random()*40;
+  s.position.set(Math.cos(ang)*rad,0.05,Math.sin(ang)*rad);
+  s.userData={ang,rad,sp:0.1+Math.random()*0.2};
+  scene.add(s); shadows.push(s);
+}
+
+/* ============ 낚시 상태머신 ============ */
+const ST={ IDLE:'idle', CAST:'cast', WAIT:'wait', BITE:'bite', MINI:'mini' };
+let state=ST.IDLE;
+let stateT=0, waitDur=0, biteTimeout=0;
+let currentFish=null;
+
+const castBtn=document.getElementById('castBtn');
+const statusEl=document.getElementById('status');
+const biteEl=document.getElementById('bite');
+const miniEl=document.getElementById('mini');
+const resultEl=document.getElementById('result');
+
+const tipWorld=new THREE.Vector3();
+const bobTarget=new THREE.Vector3();
+
+function setState(s){ state=s; stateT=0; }
+
+castBtn.addEventListener('click',()=>{
+  if(state!==ST.IDLE) return;
+  // 찌를 배 앞쪽 물 위로 던짐
+  const dir=new THREE.Vector3(Math.cos(performance.now()*0.001)*0.3+0.6,0,0.8).normalize();
+  bobTarget.set(boat.position.x+dir.x*7,0.1,boat.position.z+dir.z*7+ (Math.random()*4-2));
+  bobber.visible=true; fishingLine.visible=true;
+  castBtn.classList.add('hidden');
+  statusEl.textContent='휙~ 던졌다!';
+  setState(ST.CAST);
+});
+
+// 미니게임 입력
+let pressing=false;
+function pressDown(e){ if(state===ST.MINI){ pressing=true; e&&e.preventDefault(); } }
+function pressUp(e){ pressing=false; }
+window.addEventListener('pointerdown',pressDown);
+window.addEventListener('pointerup',pressUp);
+window.addEventListener('pointercancel',pressUp);
+
+// 입질 탭
+biteEl.addEventListener('pointerdown',(e)=>{
+  if(state!==ST.BITE) return;
+  e.preventDefault();
+  startMinigame();
+});
+
+/* ===== 미니게임 ===== */
+const zoneEl=document.getElementById('zone');
+const targetEl=document.getElementById('target');
+const progfill=document.getElementById('progfill');
+const miniTitle=document.getElementById('miniTitle');
+let mg=null;
+
+function startMinigame(){
+  biteEl.style.display='none';
+  const t=TIERS[currentFish.tier];
+  targetEl.textContent=currentFish.emoji;
+  zoneEl.style.width=t.zone+'px';
+  miniTitle.textContent=`${t.name} ${currentFish.name} 잡는 중!`;
+  miniEl.style.display='block';            // 먼저 보이게 한 뒤 너비 측정!
+  controls.enabled=false;                  // 미니게임 중엔 화면 회전 끔
+  const trackW=document.querySelector('.barwrap .track').clientWidth;
+  mg={
+    trackW, zoneW:t.zone, speed:t.speed,
+    playerX:trackW/2, vx:0,
+    progress:30, t:0,
+  };
+  statusEl.textContent='';
+  setState(ST.MINI);
+}
+
+function updateMinigame(dt){
+  mg.t+=dt;
+  const W=mg.trackW;
+  // 타겟 좌우 이동 (등급=속도)
+  const amp=(W-mg.zoneW)/2 - 6;
+  const targetX = W/2 + Math.sin(mg.t*mg.speed*1.4 + Math.sin(mg.t*0.7)) * amp;
+  // 플레이어 물리: 누르면 오른쪽, 떼면 왼쪽
+  const acc = pressing ? 900 : -700;
+  mg.vx += acc*dt;
+  mg.vx *= 0.90;
+  mg.playerX += mg.vx*dt;
+  const half=mg.zoneW/2;
+  if(mg.playerX<half){ mg.playerX=half; mg.vx=0; }
+  if(mg.playerX>W-half){ mg.playerX=W-half; mg.vx=0; }
+  // 렌더
+  zoneEl.style.left=(mg.playerX-half)+'px';
+  targetEl.style.left=targetX+'px';
+  // 판정
+  const inside = Math.abs(targetX-mg.playerX) < half;
+  if(inside) mg.progress += 32*dt;
+  else mg.progress -= 22*dt;
+  mg.progress=Math.max(0,Math.min(100,mg.progress));
+  progfill.style.width=mg.progress+'%';
+  progfill.style.background = inside ? 'linear-gradient(90deg,#8bff7a,#33cc44)' : 'linear-gradient(90deg,#ffe14d,#ff9f1a)';
+  if(mg.progress>=100){ endMinigame(true); }
+  else if(mg.progress<=0 && mg.t>1.2){ endMinigame(false); }
+}
+
+function endMinigame(success){
+  miniEl.style.display='none';
+  bobber.visible=false; fishingLine.visible=false;
+  pressing=false;
+  controls.enabled=true;                   // 화면 회전 다시 켬
+  showResult(success);
+  setState(ST.IDLE);
+}
+
+/* ===== 결과 ===== */
+const resultCard=document.getElementById('resultCard');
+function showResult(success){
+  const f=currentFish, t=TIERS[f.tier];
+  if(success){
+    caughtTotal++;
+    dex[f.id]=(dex[f.id]||0)+1;
+    saveDex();
+    document.getElementById('caughtCount').textContent=caughtTotal;
+    const size=(Math.random()*60+10).toFixed(0);
+    resultCard.innerHTML=`
+      <div class="fishbig">${f.emoji}</div>
+      <h2>${f.name} 잡았다!</h2>
+      <span class="tier" style="background:${t.color};color:#1a1a1a">⭐ ${t.name}</span>
+      <div class="size">📏 크기 ${size} cm · 총 ${caughtTotal}마리째</div>
+      <button id="againBtn">🎣 다시 낚시!</button>`;
+  } else {
+    resultCard.innerHTML=`
+      <div class="fishbig">💨</div>
+      <h2 class="miss">놓쳤다!</h2>
+      <div class="size">${f.name}가 도망갔어... 다시 도전!</div>
+      <button id="againBtn">🎣 다시 낚시!</button>`;
+  }
+  resultEl.style.display='flex';
+  document.getElementById('againBtn').onclick=()=>{
+    resultEl.style.display='none';
+    castBtn.classList.remove('hidden');
+  };
+}
+
+/* ============ 도감 UI ============ */
+const dexEl=document.getElementById('dex');
+document.getElementById('dexBtn').onclick=()=>{
+  const grid=document.getElementById('dexGrid');
+  grid.innerHTML=FISH.map(f=>{
+    const got=dex[f.id]||0; const t=TIERS[f.tier];
+    return `<div class="dexitem ${got?'':'locked'}">
+      <div class="e">${got?f.emoji:'❔'}</div>
+      <div>${got?f.name:'???'}</div>
+      <div class="cnt" style="color:${t.color}">${got?('×'+got):t.name}</div>
+    </div>`;
+  }).join('');
+  dexEl.style.display='flex';
+};
+document.getElementById('dexClose').onclick=()=>dexEl.style.display='none';
+
+/* ============ 루프 ============ */
+const clock=new THREE.Clock();
+let hintHidden=false;
+controls.addEventListener('start',()=>{
+  if(!hintHidden){ hintHidden=true; const h=document.getElementById('rotateHint'); h.style.opacity='0'; setTimeout(()=>h.remove(),700); }
+});
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.05);
+  const time=clock.elapsedTime;
+
+  // 바다 물결
+  const pos=seaGeo.attributes.position.array;
+  for(let i=0;i<pos.length;i+=3){
+    const x=seaBase[i], z=seaBase[i+2];
+    pos[i+1]=Math.sin(x*0.18+time*1.1)*0.45 + Math.cos(z*0.22+time*0.9)*0.4;
+  }
+  seaGeo.attributes.position.needsUpdate=true;
+  seaGeo.computeVertexNormals();
+
+  // 배 둥둥
+  boat.position.y=Math.sin(time*1.3)*0.18;
+  boat.rotation.z=Math.sin(time*1.1)*0.04;
+  boat.rotation.x=Math.cos(time*0.9)*0.03;
+
+  // 그림자 물고기 회전 이동
+  for(const s of shadows){
+    s.userData.ang+=s.userData.sp*dt;
+    s.position.x=Math.cos(s.userData.ang)*s.userData.rad;
+    s.position.z=Math.sin(s.userData.ang)*s.userData.rad;
+    s.rotation.y=-s.userData.ang;
+  }
+
+  // 낚싯대 끝 월드 좌표
+  rodTip.getWorldPosition(tipWorld);
+
+  // 상태별
+  stateT+=dt;
+  if(state===ST.CAST){
+    // 찌가 목표로 날아감(포물선)
+    const p=Math.min(stateT/0.7,1);
+    bobber.position.lerpVectors(tipWorld,bobTarget,p);
+    bobber.position.y += Math.sin(p*Math.PI)*2.5; // 포물선
+    if(p>=1){
+      waitDur=1.5+Math.random()*3.5;
+      currentFish=pickFish();
+      statusEl.textContent='기다리는 중... 🌊';
+      setState(ST.WAIT);
+    }
+  }
+  else if(state===ST.WAIT){
+    bobber.position.y=0.1+Math.sin(time*3)*0.06;
+    if(stateT>=waitDur){
+      biteEl.style.display='flex';
+      statusEl.textContent='입질이다! 탭해!';
+      biteTimeout=2.2; // 이 시간 안에 탭 안하면 놓침
+      setState(ST.BITE);
+    }
+  }
+  else if(state===ST.BITE){
+    bobber.position.y=0.1+Math.sin(time*22)*0.18; // 까딱까딱
+    if(stateT>=biteTimeout){
+      // 놓침
+      biteEl.style.display='none';
+      bobber.visible=false; fishingLine.visible=false;
+      showResult(false);
+      setState(ST.IDLE);
+    }
+  }
+  else if(state===ST.MINI){
+    updateMinigame(dt);
+  }
+
+  // 줄 업데이트
+  if(bobber.visible){
+    const arr=lineGeo.attributes.position.array;
+    arr[0]=tipWorld.x; arr[1]=tipWorld.y; arr[2]=tipWorld.z;
+    arr[3]=bobber.position.x; arr[4]=bobber.position.y; arr[5]=bobber.position.z;
+    lineGeo.attributes.position.needsUpdate=true;
+  }
+
+  controls.update();
+  renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
 </body>
 </html>
